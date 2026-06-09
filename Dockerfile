@@ -81,7 +81,7 @@ FROM ${NVIDIA_RUNTIME_IMAGE} AS runtime-nvidia
 ARG TORCH_VERSION=2.7.1
 ARG TORCHAUDIO_VERSION=2.7.1
 ARG TORCHVISION_VERSION=0.22.1
-ARG LLAMA_CPP_CUDA_WHEEL=cu128
+ARG LLAMA_CPP_CUDA_WHEEL=cu125
 ARG ONNXRUNTIME_GPU_WHEEL=https://files.pythonhosted.org/packages/dc/0f/696b4f94a282952239ffed39db78cb17a00ad993acd929cfac010a09759b/onnxruntime_gpu-1.26.0-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
 
 ENV DEBIAN_FRONTEND=noninteractive \
@@ -121,9 +121,14 @@ RUN python -m pip install --index-url https://download.pytorch.org/whl/cu128 \
     "torchaudio==${TORCHAUDIO_VERSION}" \
     "torchvision==${TORCHVISION_VERSION}"
 
-RUN python -m pip install \
-    --extra-index-url "https://abetlen.github.io/llama-cpp-python/whl/${LLAMA_CPP_CUDA_WHEEL}" \
-    "llama-cpp-python>=0.3.23"
+RUN python -m pip install diskcache "numpy>=1.20.0" "typing-extensions>=4.5.0" "jinja2>=2.11.3" \
+    && python -m pip install --no-deps \
+        --index-url "https://abetlen.github.io/llama-cpp-python/whl/${LLAMA_CPP_CUDA_WHEEL}" \
+        "llama-cpp-python>=0.3.23" \
+    && LLAMA_CPP_LIB="$(python -c 'import pathlib, sysconfig; print(pathlib.Path(sysconfig.get_paths()["purelib"]) / "llama_cpp/lib/libllama.so")')" \
+    && ldd "${LLAMA_CPP_LIB}" | tee /tmp/llama-cpp-python-ldd.txt \
+    && grep -Eq 'libcuda\.so|libcudart|libcublas' /tmp/llama-cpp-python-ldd.txt \
+    && rm -f /tmp/llama-cpp-python-ldd.txt
 
 COPY requirements.txt .
 
