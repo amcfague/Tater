@@ -1,6 +1,6 @@
 # Optional NVIDIA build for local STT/TTS acceleration.
 # The default Dockerfile stays CPU-first; use this with docker-compose.nvidia.yml.
-FROM python:3.11-slim
+FROM python:3.11-slim AS base
 
 ENV PIP_NO_CACHE_DIR=1 \
     PYTHONUNBUFFERED=1 \
@@ -28,6 +28,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && update-ca-certificates \
  && rm -rf /var/lib/apt/lists/*
 
+FROM base AS python-deps
+
 COPY requirements.txt .
 
 RUN python -m pip install --upgrade pip \
@@ -39,6 +41,10 @@ RUN python -m pip install --upgrade pip \
  && python -m pip uninstall -y onnxruntime \
  && python -m pip install onnxruntime-gpu \
  && python -c "from importlib import metadata; from google.protobuf import runtime_version; import aioesphomeapi, torch, torchaudio, transformers, webrtcvad, openwakeword, nanowakeword; assert getattr(aioesphomeapi, 'APIClient', None); print('protobuf_runtime', runtime_version.__name__, 'aioesphomeapi', getattr(aioesphomeapi, '__version__', 'unknown'), 'torch', torch.__version__, 'cuda', torch.version.cuda, 'torchaudio', torchaudio.__version__, 'transformers', transformers.__version__, 'llama_cpp_python', metadata.version('llama-cpp-python'), 'webrtcvad', webrtcvad.__name__, 'openwakeword', getattr(openwakeword, '__name__', 'openwakeword'), 'nanowakeword', getattr(nanowakeword, '__name__', 'nanowakeword'))"
+
+FROM base AS runtime
+
+COPY --from=python-deps /usr/local /usr/local
 
 COPY . .
 
